@@ -1,7 +1,33 @@
 /* eslint-disable no-alert, no-console */
 <template>
     <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
-        <div class="container">
+        <div
+            v-if="isLoad == false"
+            class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
+        >
+            <svg
+                class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+            >
+                <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                ></circle>
+                <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+            </svg>
+        </div>
+
+        <div v-else class="container">
             <div class="w-full my-4"></div>
             <section>
                 <div class="flex">
@@ -21,6 +47,33 @@
                                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
                                 placeholder="Например DOGE"
                             />
+                        </div>
+                        <div
+                            class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
+                        >
+                            <span
+                                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                            >
+                                BTC
+                            </span>
+                            <span
+                                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                            >
+                                DOGE
+                            </span>
+                            <span
+                                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                            >
+                                BCH
+                            </span>
+                            <span
+                                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                            >
+                                CHD
+                            </span>
+                        </div>
+                        <div class="text-sm text-red-600">
+                            Такой тикер уже добавлен
                         </div>
                     </div>
                 </div>
@@ -144,34 +197,67 @@ export default {
     name: 'App',
     data() {
         return {
+            isLoad: false,
             ticker: '',
             tickers: [],
             select: null,
             graph: [],
+            coins: [],
         }
     },
+    created() {
+        const tickersData = localStorage.getItem('cryptonomicon-list')
+        if (tickersData) {
+            console.log(tickersData)
+            this.tickers = JSON.parse(tickersData)
+            this.tickers.forEach((ticker) => {
+                this.updateTickers(ticker.name)
+            })
+        }
+    },
+    mounted() {
+        fetch(
+            'https://min-api.cryptocompare.com/data/all/coinlist?summary=true'
+        )
+            .then((response) => response.json())
+            .then((data) => {
+                // this.coins = data.filter((element) => element['symbol'])
+                console.log(data)
+            }),
+            setTimeout(() => {
+                this.isLoad = true
+            }, 1000)
+    },
     methods: {
+        updateTickers(tickerName) {
+            // получаем данные с сервера
+            setInterval(async () => {
+                const f = await fetch(
+                    `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=ae5600b161dd0572c71ac9854698ebdd84a0007f812e294fe6064edf3f3ae55f`
+                )
+                const data = await f.json()
+                this.tickers.find((t) => t.name === tickerName).price =
+                    data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
+
+                // рисуем график
+                if (this.select?.name === tickerName) {
+                    this.graph.push(data.USD) // сохраним данные в массиве
+                }
+            }, 3000)
+        },
         add() {
             const currentTicker = {
                 name: this.ticker,
                 price: '-',
             }
             this.tickers.push(currentTicker)
-            // получаем данные с сервера
-            setInterval(async () => {
-                const f = await fetch(
-                    `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=ae5600b161dd0572c71ac9854698ebdd84a0007f812e294fe6064edf3f3ae55f`
-                )
-                const data = await f.json()
-                this.tickers.find((t) => t.name === currentTicker.name).price =
-                    data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
-
-                // рисуем график
-                if (this.select?.name === currentTicker.name) {
-                    this.graph.push(data.USD) // сохраним данные в массиве
-                }
-            }, 3000)
             this.ticker = ''
+
+            localStorage.setItem(
+                'cryptonomicon-list',
+                JSON.stringify(this.tickers)
+            )
+            this.updateTickers(currentTicker)
         },
         selectTicker(ticker) {
             this.select = ticker
